@@ -220,4 +220,4 @@ def is_image_file(path):
     """
     path = path if isinstance(path, Path) else Path(path)
     _, ext = os.path.splitext(path.absolute())
-    return path.is_file() and ext in consts.IMAGE_FILE_EXT
+    return path.is_file() and ext.lower() in consts.IMAGE_FILE_EXT
