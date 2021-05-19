@@ -3,8 +3,9 @@
 PyCharm Editor
 Author cyRi-Le
 """
-from enum import Enum
 import cv2
+from enum import Enum
+
 H = 860
 W = 600
 MIN_CIRCLE_AREA = 1e5
@@ -19,6 +20,8 @@ DEALER_FONT_COLOR = (0, 102, 51)
 FONT_THICKNESS = 20
 DEALER_PATTERN_PATH = "patterns/dealer.jpg"
 IMAGE_FILE_EXT = [".jpg", ".jpeg", ".bmp", ".png"]
+MIN_THRESHOLD_VAL = 100
+
 class Position(Enum):
     TOP_LEFT = (0, 0)
     TOP_RIGHT = (1, 0)
@@ -32,4 +35,3 @@ class Ordinal(Enum):
     NORTH = 2
     WEST = 3
     NONE = -1
-

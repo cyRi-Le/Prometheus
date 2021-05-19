@@ -3,21 +3,33 @@
 PyCharm Editor
 Author cyRi-Le
 """
-import cv2
-import matplotlib.pyplot as plt
-import pylab as p
-import tqdm
 
+
+import cv2
+import tqdm
 import consts
-from detection.segmentation import process_threshold, find_contours, match_pattern
-from player import Player
+import numpy as np
 from pathlib import Path
-from utils import is_image_file, keep_and_order_by_criterion, keep_contour_with_min_area, select_k, \
-    order_anti_clockwise, criterion_card_like, assign_dealer
-import os
+from player import Player
+import matplotlib.pyplot as plt
+from typing import Optional, List
+from utils import (select_k,
+                   is_image_file,
+                   assign_dealer,
+                   criterion_card_like,
+                   order_anti_clockwise,
+                   keep_contour_with_min_area,
+                   keep_and_order_by_criterion)
+from detection.segmentation import (find_contours,
+                                    match_pattern,
+                                    process_threshold)
 
 
 class Game:
+    """
+    Enfold the logic around a game
+    Use the segmentation, utils and player logic to process each step of the game
+    """
     def __init__(self, path):
         self.path = path if isinstance(path, Path) else Path(path)
         self.P1 = None
@@ -25,23 +37,24 @@ class Game:
         self.P3 = None
         self.P4 = None
         self.players = [None] * 4
-        self.paths = [p for p in self.path.iterdir() if is_image_file(p)]
+        self._paths = [p for p in self.path.iterdir() if is_image_file(p)]
         self.images = []
-        self._roi_table = [None] * len(self.paths)
+        self._roi_table = [None] * len(self._paths)
         self._current_step = -1
         self._processed_steps = []
-        self.max_step = len(self.paths)
+        self.max_step = len(self._paths)
         self.is_done = False
 
-    def load_images(self, verbose=True):
+    def load_images(self, verbose: Optional[bool] = None) -> List[np.ndarray]:
         """
-
-        :return:
+        Load the images whose paths are in self._paths (created at initialization)
+        :return: The list of loaded images
         """
+        verbose = True if verbose is None else verbose
         self.images = []
-        assert len(self.paths) > 0, f"{self.path.absolute()} contains no valid image file"
+        assert len(self._paths) > 0, f"{self.path.absolute()} contains no valid image file"
         print("Loading files") if verbose else None
-        paths = tqdm.tqdm(self.paths) if verbose else self.paths
+        paths = tqdm.tqdm(self._paths) if verbose else self._paths
         errors = []
         for p in paths:
             try:
@@ -56,14 +69,18 @@ class Game:
                 len(errors) > 0)) if verbose else None
         return self.images
 
-    def process_step(self, k: int):
+    def process_step(self, k: int,
+                     show_step: Optional[bool] = None):
         """
-
-        :param k:
+        Process step k of the game and return the ROI of the players (dimension taken in consts.py)
+        and the the overlay of players' name and contours
+        :param show_step: Whether to show the process step step
+        :param k: Step to process
         """
         assert -1 < k < len(self.images), f"the step must be between {-1} and {len(self.images)} but you provided {k}"
         src = self.images[k]
-        bw = process_threshold(src, True, min_val=100)
+        show_step = False if show_step is None else show_step
+        bw = process_threshold(src, True, min_val=consts.MIN_THRESHOLD_VAL)
         contours = find_contours(bw)
         contours = keep_and_order_by_criterion(contours, criterion_card_like)
         contours = keep_contour_with_min_area(contours, consts.MIN_CARD_AREA)
@@ -89,12 +106,13 @@ class Game:
         self.P4.write_text(src, "P4")
         roi = [roi_p1, roi_p2, roi_p3, roi_p4]
         self._roi_table[k] = roi
-        plt.title(f"Game step {k}")
-        plt.imshow(src)
-        plt.show()
+        if show_step:
+            plt.title(f"Game step {k}")
+            plt.imshow(src)
+            plt.show()
         return roi, src
 
-#fixme
+#fixme dev suspendu (no use)
     def initialize_game(self):
         """
 
@@ -104,8 +122,8 @@ class Game:
 
     def next_step(self):
         """
-
-        :return:
+        Process the next step of the game and update the current_step and game status
+        :return: either None, None if game is ended or ROI, dest
         """
         if self.is_done:
             return None, None

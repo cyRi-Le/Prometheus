@@ -3,25 +3,25 @@
 PyCharm Editor
 Author cyRi-Le
 """
-from enum import Enum
-from typing import Iterable, Optional, List, Tuple, Callable
-import numpy as np
-
-import consts
-from player import Player
-import cv2
 import os
+import cv2
+import consts
+import numpy as np
 from pathlib import Path
+from player import Player
+from typing import Optional, List, Tuple, Callable
 
 
 def assign_dealer(players: List[Player],
                   dealer_contour: Optional[List] = None,
                   dealer_center: Optional[Tuple] = None):
     """
-
-    :param dealer_center:
-    :param players:
-    :param dealer_contour:
+    Assign dealer to one of the given players based on minimum distance
+    from player's contour to the dealer mark
+    Once the dealer is assigned, the player prints a greeting message :)
+    :param dealer_center: Optional coordinates of the dealer mark center
+    :param players: List of players
+    :param dealer_contour: contour of the dealer mark given by cv2.findContours()
     """
     dist = [player.distance_to(dealer_contour, dealer_center) for player in players]
     dealer = np.argmin(dist)
@@ -31,9 +31,10 @@ def assign_dealer(players: List[Player],
 
 def bounding_box(contour: List):
     """
-
-    :param contour:
-    :return:
+    Return the box points of the minimum enclosing rectangle
+    designed to be used in cv2.drawContours()
+    :param contour: contour given by cv2.findContours()
+    :return: box points of the minimum enclosing rectangle
     """
     rect = cv2.minAreaRect(contour)
     box = cv2.boxPoints(rect)
@@ -43,9 +44,10 @@ def bounding_box(contour: List):
 
 def circle_box(contour: List):
     """
-
-    :param contour:
-    :return:
+    Return the center and the radius of the minimum enclosing circle
+    designed to be used in cv2.circle()
+    :param contour: contour given by cv2.findContours()
+    :return: center and radius of the minimum enclosing circle
     """
     (x, y), radius = cv2.minEnclosingCircle(contour)
     center = (int(x), int(y))
@@ -60,12 +62,12 @@ def criterion_card_like(contour: List,
                         min_val_2: Optional[float] = 0.5):
     """
 
-    :param min_rect:
-    :param min_val_2:
-    :param min_val_1:
-    :param max_val_1:
-    :param contour:
-    :return:
+    :param min_rect: Optional rectangle given by cv2.minAreaContour()
+    :param min_val_2: Minimum value of feature 2
+    :param min_val_1: Minimum value of feature 1
+    :param max_val_1: Maximum value of feature 1
+    :param contour: contour given by cv2.findContours()
+    :return bool & float: Whether the contour is valid or not and the values of feature
     """
     min_rect = min_rect if min_rect is not None else cv2.minAreaRect(contour)
     dim1, dim2 = min_rect[1]
@@ -84,11 +86,11 @@ def criterion_circle_like(contour: List,
                           min_val: Optional[float] = 0.8,
                           max_val: Optional[float] = 1.1):
     """
-
-    :param min_val:
-    :param max_val:
-    :param contour:
-    :return:
+    Estimate how circle-like is the given contour
+    :param min_val: Minimum value of the feature
+    :param max_val: Maximum value of the feature
+    :param contour: contour given by cv2.findContours()
+    :return bool & float: Whether the contour is valid or not and the value of feature
     """
     _, _, radius = cv2.minEnclosingCircle(contour)
     min_rect = cv2.minAreaRect(contour)
@@ -101,10 +103,11 @@ def compute_area_criterion(contour: List,
                            criterion: Callable,
                            **kwargs):
     """
-
-    :param criterion:
-    :param contour:
-    :return:
+    Compute the area of the contour w.r.t to its validity given by criterion
+    :param criterion: Function which return a tuple of boolean (first) and a value (second)
+    :param contour: contour given by cv2.findContours()
+    :return area: either 0. (contour is not valid for criterion) or cv2.contourArea()
+    if the contour is valid for the given criterion
     """
     if criterion(contour, **kwargs)[0]:
         return cv2.contourArea(contour)
@@ -114,9 +117,9 @@ def compute_area_criterion(contour: List,
 def keep_contour_with_min_area(contours: List[List],
                                min_area: float) -> List[List]:
     """
-
-    :param contours:
-    :param min_area:
+    Keep contours whose area is at least min_area
+    :param contours: List of contours given by cv2.findContours()
+    :param min_area: Minimum area
     """
     return [cnt for cnt in contours if cv2.contourArea(cnt) >= min_area]
 
@@ -124,11 +127,12 @@ def keep_contour_with_min_area(contours: List[List],
 def order_anti_clockwise(contours: List[List],
                          min_rects: Optional[List[Tuple]] = None) -> Tuple[list, list, list, list]:
     """
-
-    :param min_rects:
-    :param contours:
-    :return:
+    Rank a list of 4 contours in anti-clockwise order
+    :param min_rects: Optional List of rectangles given by cv2.minAreaContour()
+    :param contours: List of contours given by cv2.findContours()
+    :return contours: In anti-clockwise ordering
     """
+    assert len(contours) == 4, f"order_anti_clockwise takes a list of 4 contours but {len(contours)} where given"
     min_rects = min_rects if min_rects is not None else [cv2.minAreaRect(contour) for contour in contours]
     SOUTH = np.argmax([min_rect[0][1] for min_rect in min_rects])
     NORTH = np.argmin([min_rect[0][1] for min_rect in min_rects])
@@ -142,12 +146,12 @@ def select_k(contours: List[List],
              min_rects: Optional[List[Tuple]] = None,
              k: Optional[int] = 4) -> Tuple[List, bool]:
     """
-
-    :param min_rects:
-    :param contours:
-    :param min_distance:
-    :param k:
-    :return:
+    Select the k first contours mutually distant from at least min_distance
+    :param min_rects: Optional List of rectangles given by cv2.minAreaContour()
+    :param contours: List of contours given by cv2.findContours()
+    :param min_distance: Minimum mutual distance
+    :param k: number of element to return
+    :return selected: k first contours mutually distance from at least min_distance
     """
     distance_map = build_distance_map(contours, min_rects)
     n = len(distance_map)
@@ -168,10 +172,11 @@ def select_k(contours: List[List],
 def build_distance_map(contours: List[List],
                        min_rects: Optional[List[Tuple]] = None) -> np.ndarray:
     """
-
-    :param min_rects:
-    :param contours:
-    :return:
+    Build symmetric matrix where element i,j represents the distance from
+    contour i center  to contour j center
+    :param min_rects: Optional List of rectangles given by cv2.minAreaContour()
+    :param contours:  List of contours given by cv2.findContours()
+    :return map + map.T: Symmetric matrix of distance between contours
     """
     n = len(contours)
     min_rects = min_rects if min_rects is not None else [cv2.minAreaRect(contour) for contour in contours]
@@ -192,12 +197,14 @@ def keep_and_order_by_criterion(contours: List[List],
                                 reverse: Optional[bool] = True,
                                 **kwargs) -> List[list]:
     """
+    Given a criterion the function the elements which
+    satisfies the criterion in ascending order of criterion values
 
-    :param contours:
-    :param criterion:
-    :param reverse:
-    :param kwargs:
-    :return:
+    :param contours: List of contours given by cv2.findContours()
+    :param criterion: Function which return a tuple of boolean (first) and a value (second)
+    :param reverse: Ascending (False) or descending (True) order
+    :param kwargs: Any additional parameters to give to the function criterion
+    :return contours: Valid and ordered contours by criterion
     """
     valid_contours_with_features = []
     for cnt in contours:
@@ -212,11 +219,11 @@ def keep_and_order_by_criterion(contours: List[List],
     return contours
 
 
-def is_image_file(path):
+def is_image_file(path) -> bool:
     """
-
-    :param path:
-    :return:
+    Check if the to path correspond to a valid image file
+    :param path: PosixPath or str
+    :return: boolean True if path corresponds to an image file, False otherwise
     """
     path = path if isinstance(path, Path) else Path(path)
     _, ext = os.path.splitext(path.absolute())

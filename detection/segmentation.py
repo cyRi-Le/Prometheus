@@ -3,9 +3,10 @@
 PyCharm Editor
 Author cyRi-Le
 """
-from typing import Iterable, Optional, Callable, List, Tuple
-import numpy as np
+
 import cv2
+import numpy as np
+from typing import Optional, Callable, List, Tuple
 
 
 def process_threshold(img: np.ndarray,
@@ -14,13 +15,14 @@ def process_threshold(img: np.ndarray,
                       min_val: Optional[int] = 128,
                       max_val: Optional[int] = 255):
     """
-
-    :param to_gray_level:
-    :param img:
-    :param method:
-    :param min_val:
-    :param max_val:
-    :return:
+    Apply a threshold to the BGR or Grayscale image
+    :param to_gray_level: boolean If True the image is assumed to
+    be in BGR and it is converted to Grayscale
+    :param img: Image to process thresholding on
+    :param method: thresholding technique to use (must be implemented in OpenCV)
+    :param min_val: Minimum pixel intensity
+    :param max_val: Maximum pixel intensity
+    :return: process image
     """
     method = method if method is not None else cv2.THRESH_OTSU + cv2.THRESH_BINARY
     img = img if not to_gray_level else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -28,6 +30,7 @@ def process_threshold(img: np.ndarray,
     return dest
 
 
+# fixme implementation suspendue (no use)
 def find_threshold(img: np.ndarray):
     """
 
@@ -38,27 +41,27 @@ def find_threshold(img: np.ndarray):
 
 
 def find_contours(img: np.ndarray,
-                  process: Optional[Callable] = None) -> List:
+                  process: Optional[Callable] = None,
+                  **kwargs) -> List:
     """
-
-    :param img:
-    :param process:
-    :return:
+    Find the contours and pass them (if given) to a precessing function
+    :param img: Image on which to find contours
+    :param process: Processing function must take contours as first parameter and optional kwargs
+    :return: contours or processed contours
     """
     contours, _ = cv2.findContours(img, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    #contours = np.array(contours, dtype=object)
-    return contours if process is None else process(contours)
+    return contours if process is None else process(contours, **kwargs)
 
 
 def match_pattern(img: np.ndarray,
                   pattern: np.ndarray,
                   match_method: Optional[int] = None) -> Tuple:
     """
-
-    :param img:
-    :param pattern:
-    :param match_method:
-    :return:
+    Look for a given pattern on the image using the given method (implemented in OpenCV)
+    :param img: Image on which to look for contours
+    :param pattern: Pattern to look for
+    :param match_method: Method to use (one the methods implemented in OpenCV)
+    :return: The most probable box points, location, cropping of the pattern on the image
     """
     match_method = match_method if match_method is not None else cv2.TM_CCORR_NORMED
     res = cv2.matchTemplate(img, pattern, match_method)
@@ -74,20 +77,8 @@ def match_pattern(img: np.ndarray,
     box_points = np.int0([maxLoc, (ref_x + dimx, ref_y), (ref_x + dimx, ref_y + dimy), (ref_x, ref_y + dimy)])
     return box_points, center, img[maxLoc[1]: matchLoc[1] + dimy, maxLoc[0]: matchLoc[0] + dimx, :], pattern
 
-
-
-
-
-
-
 # TODO
-
-
-
-
 
 
 # TODO adapter las angles au sens naturel
 # TODO Adapter width et height a un sens conventionnel
-
-

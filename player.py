@@ -3,18 +3,18 @@
 PyCharm Editor
 Author cyRi-Le
 """
-from typing import Iterable, Optional, List, Tuple
-
 import cv2
-import numpy as np
-from enum import Enum
 import consts
+import numpy as np
 from consts import Position, Ordinal
-
-
+from typing import Optional, List, Tuple
 
 
 class Player:
+    """
+    Enfold the logic around a player
+    This class is designed to be use extensively in the Game class
+    """
     def __init__(self, contour: List,
                  ordinal: Ordinal,
                  name: Optional[str] = "P"):
@@ -32,14 +32,12 @@ class Player:
 
     def write_text(self,
                    img: np.ndarray,
-                   text: Optional[str] = None,
-                   **kwargs):
+                   text: Optional[str] = None):
         """
-
-        :param img:
-        :param text:
-        :param kwargs:
-        :return:
+        Write a text close to the player location. The text is rendered on the given image
+        :param img: Image to write on
+        :param text: Text to write
+        :return: Image with written text
         """
         text = text if text is not None else self.name
         # font
@@ -52,18 +50,18 @@ class Player:
 
         # fontScale
         fontScale = consts.FONT_SCALE
-        # Red color in BGR
+        # fontColor
         color = consts.FONT_COLOR if not self.is_dealer else consts.DEALER_FONT_COLOR
-        # Line thickness of 2 px
+        # Line thickness
         thickness = consts.FONT_THICKNESS
-        # Using cv2.putText() method
         image = cv2.putText(img, text, org, font, fontScale,
                             color, thickness, cv2.LINE_AA, False)
         return image
 
     def greetings(self):
         """
-
+        Print a greeting message once
+        If the player is the dealer it will tell it (You should trust him :)
         """
         if self.ordinal is not Ordinal.NONE:
             print(f"I am {self.name} siding {self.ordinal.name}" + " I am the dealer" * self.is_dealer)
@@ -73,9 +71,10 @@ class Player:
     def distance_to(self, contour: List,
                     target_center: Optional[Tuple] = None) -> float:
         """
-        :param target_center:
-        :param contour:
-        :return:
+        Compute the distance from the player's contour center to a target contour center
+        :param target_center: Optional center of the target contour
+        :param contour: Contour given by cv2.findContours()
+        :return float : Euclidean distance from the player to the target contour
         """
         target_center = target_center if target_center is not None else cv2.minAreaRect(contour)[0]
         return ((self.centerx - target_center[0]) ** 2 + (self.centery - target_center[1]) ** 2) ** 0.5
@@ -83,11 +82,19 @@ class Player:
     # fixme
     def standard_box(self, h, w):
         """
-        The common misconception of the "box" values is that the first sub-list of the "box" ndarray
-        is always the bottom-left point of the rectangle.
-        :param w:
-        :param h:
-        :return:
+        Return boxPoints corresponding to the rectangle of dimensions h, w
+        concentric with the players cv2.minAreaContour() and same orientation
+
+        WARNING: The box points returned by cv2.boxPoints(min_rect) are
+        not always in the same order i.e (top-left -> bottom-left etc.) Their order depends on
+        what is called width / height and the value of angle in the tuple given by cv2.minAreaContour()
+        Two rectangle can have the same visual orientation and dimensions but their cv2.boxPoints() could be
+        in very different orientations. So the boxPoints returned by this function are not assumed to be
+        in the orientation of the player's boxPoints. That's why we need _get_box_points_order() to further
+        rearrange the points before doing a Perspective Transform
+        :param w: Width (automatically adapted to type of player)
+        :param h: Height (automatically adapted to type of player)
+        :return: Enlarged rectangle's boxPoints
         """
         angle = self.angle
         if self.width > self.height:
@@ -101,9 +108,9 @@ class Player:
     # @private
     def _get_box_points_order(self) -> List[Position]:
         """
-
-        :param box_points:
-        :return:
+        Return the order of the player's box points
+        :return: A list of position where the i-th element is
+        the Position of the i-th point the player's box points
         """
         ordered = [None] * 4
         box_points = self.box
@@ -126,25 +133,24 @@ class Player:
     # @private
     def _new_box_points(self, dimx, dimy):
         """
-
-        :param dimx:
-        :param dimy:
-        :param box_points:
-        :param ordered:
-        :return:
+        Return a new box points and most importantly the points are in the
+        same order of the box points as player's box points
+        :param dimx: Dimension along x axis
+        :param dimy: Dimension along y axis
+        :return: Box points oriented in the same order
         """
         ordered = self._get_box_points_order()
         return [np.array(t.value) * (dimx - 1, dimy - 1) for t in ordered]
 
     def roi_centered(self, img, h, w):
         """
-
-        :param img:
-        :param w:
-        :param h:
-        :return:
+        Return and draw the rectangle of the ROI of dimensions h,w of the player on img
+        The ROI is oriented is returned the way the player sees it from its seat
+        :param img: Given img to draw ROI rectangle on and extract cropped ROI
+        :param w: Width (automatically adapted to type of player)
+        :param h: Height (automatically adapted to type of player)
+        :return: The ROI of the player always in same dimensions no matter the player
         """
-        std_box = np.int0(self.standard_box(w, h))
         src_box = self.standard_box(w, h).astype('float32')
         h_, w_ = h, w
         if self.width > self.height:
@@ -163,5 +169,5 @@ class Player:
         M = cv2.getPerspectiveTransform(src_box, dst_box)
         size = (w_, h_) if not rotate else (h_, w_)
         warped = cv2.warpPerspective(img.copy(), M, size)
-        cv2.drawContours(img, [std_box], -1, consts.BOUNDING_BOX_COLOR, consts.BOUNDING_BOX_THICKNESS)
+        cv2.drawContours(img, [np.int0(src_box)], -1, consts.BOUNDING_BOX_COLOR, consts.BOUNDING_BOX_THICKNESS)
         return warped if not rotate else cv2.rotate(warped, cv2.ROTATE_90_CLOCKWISE)
