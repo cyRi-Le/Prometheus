@@ -18,8 +18,8 @@ from utils import (select_k,
                    assign_dealer,
                    criterion_card_like,
                    order_anti_clockwise,
-                   keep_contour_with_min_area,
-                   keep_and_order_by_criterion)
+                   keep_contour_with_min_max_area,
+                   keep_and_order_by_criterion, order_files_by_name)
 from detection.segmentation import (find_contours,
                                     match_pattern,
                                     process_threshold)
@@ -37,7 +37,8 @@ class Game:
         self.P3 = None
         self.P4 = None
         self.players = [None] * 4
-        self._paths = [p for p in self.path.iterdir() if is_image_file(p)]
+        # paths are assumed to be given by os.listdir in a non deterministic way
+        self._paths = order_files_by_name([p for p in self.path.iterdir() if is_image_file(p)])
         self.images = []
         self._roi_table = [None] * len(self._paths)
         self._current_step = -1
@@ -83,7 +84,7 @@ class Game:
         bw = process_threshold(src, True, min_val=consts.MIN_THRESHOLD_VAL)
         contours = find_contours(bw)
         contours = keep_and_order_by_criterion(contours, criterion_card_like)
-        contours = keep_contour_with_min_area(contours, consts.MIN_CARD_AREA)
+        contours = keep_contour_with_min_max_area(contours, consts.MIN_CARD_AREA, consts.MAX_CARD_AREA)
         contours, success = select_k(contours, consts.CARD_MIN_DISTANCE)
         anti_clockwise_ordered_contours = order_anti_clockwise(contours)
         a_c_o = anti_clockwise_ordered_contours
@@ -120,7 +121,7 @@ class Game:
         """
         return None
 
-    def next_step(self):
+    def next_step(self, show_step=True):
         """
         Process the next step of the game and update the current_step and game status
         :return: either None, None if game is ended or ROI, dest
@@ -128,10 +129,12 @@ class Game:
         if self.is_done:
             return None, None
         if self._current_step < self.max_step:
-            ret = self.process_step(self._current_step + 1)
+            ret = self.process_step(self._current_step + 1, show_step=show_step)
             self._current_step += 1
             self.is_done = self._current_step + 1 == self.max_step
             return ret
         else:
             self.is_done = True
             return None, None
+    def compute_score(self):
+        return None

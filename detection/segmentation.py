@@ -24,7 +24,7 @@ def process_threshold(img: np.ndarray,
     :param max_val: Maximum pixel intensity
     :return: process image
     """
-    method = method if method is not None else cv2.THRESH_OTSU + cv2.THRESH_BINARY
+    method = method if method is not None else cv2.THRESH_BINARY + cv2.THRESH_OTSU
     img = img if not to_gray_level else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     _, dest = cv2.threshold(img, min_val, max_val, method)
     return dest

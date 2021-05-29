@@ -170,4 +170,5 @@ class Player:
         size = (w_, h_) if not rotate else (h_, w_)
         warped = cv2.warpPerspective(img.copy(), M, size)
         cv2.drawContours(img, [np.int0(src_box)], -1, consts.BOUNDING_BOX_COLOR, consts.BOUNDING_BOX_THICKNESS)
-        return warped if not rotate else cv2.rotate(warped, cv2.ROTATE_90_CLOCKWISE)
+        angle = cv2.ROTATE_180 if (self.ordinal is Ordinal.WEST or self.ordinal is Ordinal.NORTH) else cv2.ROTATE_90_CLOCKWISE
+        return warped if not rotate else cv2.rotate(warped, angle)

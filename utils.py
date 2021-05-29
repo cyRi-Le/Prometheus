@@ -57,9 +57,9 @@ def circle_box(contour: List):
 
 def criterion_card_like(contour: List,
                         min_rect: Optional[Tuple] = None,
-                        min_val_1: Optional[float] = 1.3,
-                        max_val_1: Optional[float] = 2.,
-                        min_val_2: Optional[float] = 0.5):
+                        min_val_1: Optional[float] = 1.1,
+                        max_val_1: Optional[float] = 1.7,
+                        min_val_2: Optional[float] = 0.1):
     """
 
     :param min_rect: Optional rectangle given by cv2.minAreaContour()
@@ -114,14 +114,22 @@ def compute_area_criterion(contour: List,
     return 0.
 
 
-def keep_contour_with_min_area(contours: List[List],
-                               min_area: float) -> List[List]:
+def compute_area(contour):
+    w, h = cv2.minAreaRect(contour)[1]
+    return w * h
+
+
+def keep_contour_with_min_max_area(contours: List[List],
+                                   min_area: float,
+                                   max_area: float) -> List[List]:
     """
     Keep contours whose area is at least min_area
+    :param max_area: Maximum area
     :param contours: List of contours given by cv2.findContours()
     :param min_area: Minimum area
     """
-    return [cnt for cnt in contours if cv2.contourArea(cnt) >= min_area]
+    # fixme la methode contourArea fonctionne mal dans le cas de 5.8jpeg par exemple
+    return [cnt for cnt in contours if min_area <= compute_area(cnt) < max_area]
 
 
 def order_anti_clockwise(contours: List[List],
@@ -132,7 +140,7 @@ def order_anti_clockwise(contours: List[List],
     :param contours: List of contours given by cv2.findContours()
     :return contours: In anti-clockwise ordering
     """
-    assert len(contours) == 4, f"order_anti_clockwise takes a list of 4 contours but {len(contours)} where given"
+    #    assert len(contours) == 4, f"order_anti_clockwise takes a list of 4 contours but {len(contours)} where given"
     min_rects = min_rects if min_rects is not None else [cv2.minAreaRect(contour) for contour in contours]
     SOUTH = np.argmax([min_rect[0][1] for min_rect in min_rects])
     NORTH = np.argmin([min_rect[0][1] for min_rect in min_rects])
@@ -228,3 +236,16 @@ def is_image_file(path) -> bool:
     path = path if isinstance(path, Path) else Path(path)
     _, ext = os.path.splitext(path.absolute())
     return path.is_file() and ext.lower() in consts.IMAGE_FILE_EXT
+
+
+def order_files_by_name(paths: List[Path],
+                        max_length: Optional[int] = None):
+    """
+    Sort filenames by increasing order
+    The order is given by Python sorted built-in
+    :param paths:
+    :param max_length:
+    :return:
+    """
+    max_length = max_length if max_length is not None else consts.MAX_FILE_NAME_LENGTH
+    return sorted(paths, key=lambda path: path.name.zfill(max_length))
