@@ -13,28 +13,32 @@ from typing import Optional, List, Tuple, Callable
 
 
 def assign_dealer(players: List[Player],
+                  greetings: Optional[bool] = None,
                   dealer_contour: Optional[List] = None,
-                  dealer_center: Optional[Tuple] = None):
+                  dealer_center: Optional[Tuple] = None) -> int:
     """
     Assign dealer to one of the given players based on minimum distance
     from player's contour to the dealer mark
     Once the dealer is assigned, the player prints a greeting message :)
     :param dealer_center: Optional coordinates of the dealer mark center
     :param players: List of players
-    :param dealer_contour: contour of the dealer mark given by cv2.findContours()
+    :param greetings: Whether to print greetings
+    :param dealer_contour: Contour of the dealer mark given by cv2.findContours()
     """
     dist = [player.distance_to(dealer_contour, dealer_center) for player in players]
     dealer = np.argmin(dist)
+    greetings = greetings if greetings is not None else False
     players[dealer].is_dealer = True
-    players[dealer].greetings()
+    players[dealer].greetings() if greetings else None
+    return dealer
 
 
 def bounding_box(contour: List):
     """
     Return the box points of the minimum enclosing rectangle
     designed to be used in cv2.drawContours()
-    :param contour: contour given by cv2.findContours()
-    :return: box points of the minimum enclosing rectangle
+    :param Contour: contour given by cv2.findContours()
+    :return: Box points of the minimum enclosing rectangle
     """
     rect = cv2.minAreaRect(contour)
     box = cv2.boxPoints(rect)
@@ -46,8 +50,8 @@ def circle_box(contour: List):
     """
     Return the center and the radius of the minimum enclosing circle
     designed to be used in cv2.circle()
-    :param contour: contour given by cv2.findContours()
-    :return: center and radius of the minimum enclosing circle
+    :param Contour: contour given by cv2.findContours()
+    :return: Center and radius of the minimum enclosing circle
     """
     (x, y), radius = cv2.minEnclosingCircle(contour)
     center = (int(x), int(y))
@@ -66,7 +70,7 @@ def criterion_card_like(contour: List,
     :param min_val_2: Minimum value of feature 2
     :param min_val_1: Minimum value of feature 1
     :param max_val_1: Maximum value of feature 1
-    :param contour: contour given by cv2.findContours()
+    :param contour: Contour given by cv2.findContours()
     :return bool & float: Whether the contour is valid or not and the values of feature
     """
     min_rect = min_rect if min_rect is not None else cv2.minAreaRect(contour)
@@ -89,7 +93,7 @@ def criterion_circle_like(contour: List,
     Estimate how circle-like is the given contour
     :param min_val: Minimum value of the feature
     :param max_val: Maximum value of the feature
-    :param contour: contour given by cv2.findContours()
+    :param contour: Contour given by cv2.findContours()
     :return bool & float: Whether the contour is valid or not and the value of feature
     """
     _, _, radius = cv2.minEnclosingCircle(contour)
@@ -105,7 +109,7 @@ def compute_area_criterion(contour: List,
     """
     Compute the area of the contour w.r.t to its validity given by criterion
     :param criterion: Function which return a tuple of boolean (first) and a value (second)
-    :param contour: contour given by cv2.findContours()
+    :param contour: Contour given by cv2.findContours()
     :return area: either 0. (contour is not valid for criterion) or cv2.contourArea()
     if the contour is valid for the given criterion
     """
@@ -115,6 +119,11 @@ def compute_area_criterion(contour: List,
 
 
 def compute_area(contour):
+    """
+    Compute the rectangle area of a contour
+    :param contour: Contour given by cv2.findContours()
+    :return: Area of the contour
+    """
     w, h = cv2.minAreaRect(contour)[1]
     return w * h
 
@@ -243,9 +252,146 @@ def order_files_by_name(paths: List[Path],
     """
     Sort filenames by increasing order
     The order is given by Python sorted built-in
-    :param paths:
-    :param max_length:
-    :return:
+    :param paths: List of paths
+    :param max_length: Maximum length of file name
+    :return: List of ordered by name filenames
     """
     max_length = max_length if max_length is not None else consts.MAX_FILE_NAME_LENGTH
     return sorted(paths, key=lambda path: path.name.zfill(max_length))
+
+
+def preds_to_ranks(preds):
+    """
+    Get the ranks from the predictions given by the classifier
+    :param preds: Predictions given by the classifier
+    :return: List of ranks
+    """
+    return [pred[0] for pred in preds]
+
+
+def preds_to_suits(preds):
+    """
+    Get the suits from the predictions  given by the classifier
+    :param preds: Predictions given by the classifier
+    :return: List of suits
+    """
+    return [pred[1] for pred in preds]
+
+
+def compute_standard_points(preds: List[str]) -> List[int]:
+    """
+    Compute the points won by each player using standard rules c.f project description
+    :param preds: Predictions given by the classifier
+    :return:
+    """
+    ranks = preds_to_ranks(preds)
+    ranks_number = [consts.RANKS_NUMBER[rank] for rank in ranks]
+    rmax = np.argmax(ranks_number)
+    return np.int0([ranks_number[i] == ranks_number[rmax] for i in range(len(ranks))])
+
+
+def compute_advanced_points(preds: List[str],
+                            dealer_idx: int) -> List[int]:
+    """
+    Compute the points won by each player using standard rules c.f project description
+    :param dealer_idx: Index of the current dealer 0 (SOUTH) 1(EAST) 2(NORTH) 3(WEST)
+    :param preds: Predictions given by the classifier
+    :return: List of score won by each player
+    """
+    ranks = preds_to_ranks(preds)
+    suits = preds_to_suits(preds)
+    dealer_suit = suits[dealer_idx]
+    ranks_number = [None] * len(ranks)
+    for k in range(len(ranks)):
+        ranks_number[k] = consts.RANKS_NUMBER[ranks[k]] if suits[k] == dealer_suit else -1
+    rmax = np.argmax(ranks_number)
+    return np.int0([ranks_number[i] == ranks_number[rmax] for i in range(len(ranks))])
+
+
+def save_img_files(data: List[np.ndarray],
+                   save_dir: Optional[Path] = None,
+                   filenames: Optional[List[str]] = None,
+                   ext: Optional[str] = None):
+    """
+    Save the files with filenames in save_dit using file extension ext
+    :param data: Image files to save
+    :param save_dir: Direction where to save
+    :param filenames: Names of files
+    :param ext: File extension to use in cv2.imwrite()
+    """
+    ext = ext if ext is not None else "jpg"
+    save_dir = save_dir if save_dir is not None else consts.DEFAULT_SAVE_DIR
+    save_dir = str(save_dir.absolute()) if isinstance(save_dir, Path) else save_dir
+    filenames = filenames if filenames is not None else [f"{save_dir}/{k}.{ext}" for k in range(len(data))]
+    for img, fname in zip(data, filenames):
+        cv2.imwrite(fname, img)
+
+# The 2 functions below where provided as part of the project
+def evaluate_game(pred, cgt, mode_advanced=False):
+    """
+    Evaluates the accuracy of your predictions. The same function will be used to assess the
+    performance of your model on the final test game.
+    Parameters
+    ----------
+    pred: array of string of shape NxD
+        Prediction of the game. N is the number of round (13) and D the number of players (4). Each row
+        is composed of D string. Each string can is composed of 2 characters [0-9, J, Q, K] + [C, D, H, S].
+        If the mode_advanced is False only the rank is evaluated. Otherwise, both rank and colours are
+        evaluated (suits).
+    cgt: array of string of shape NxD
+        Ground truth of the game. Same format as the prediction.
+    mode_advanced: bool, optional
+        Choose the evaluation mode
+
+    Returns
+    -------
+    accuracy: float
+        Accuracy of the prediction wrt the ground truth. Number of correct entries divided by
+        the total number of entries.
+    """
+    if pred.shape != cgt.shape:
+        raise Exception("Prediction and ground truth should have same shape.")
+
+    if mode_advanced:
+        # Full performance of the system. Cards ranks and colours.
+        return (pred == cgt).mean()
+    else:
+        # Simple evaluation based on cards ranks only
+        cgt_simple = np.array([v[0] for v in cgt.flatten()]).reshape(cgt.shape)
+        pred_simple = np.array([v[0] for v in pred.flatten()]).reshape(pred.shape)
+        return (pred_simple == cgt_simple).mean()
+
+
+def print_results(rank_colour, dealer, pts_standard, pts_advanced):
+    """
+    Print the results for the final evaluation. You NEED to use this function when presenting the results on the
+    final exam day.
+
+    Parameters
+    ----------
+    rank_colour: array of string of shape NxD
+        Prediction of the game. N is the number of round (13) and D the number of players (4). Each row
+        is composed of D string. Each string can is composed of 2 charcters [0-9, J, Q, K] + [C, D, H, S].
+    dealer: list of int
+        Id ot the players that were selected as dealer ofr each round.
+    pts_standard: list of int of length 4
+        Number of points won bay each player along the game with standard rules.
+    pts_advanced: list of int of length 4
+        Number of points won bay each player along the game with advanced rules.
+    """
+    print('The cards played were:')
+    print(pp_2darray(rank_colour))
+    print('Players designated as dealer: {}'.format(dealer))
+    print('Players points (standard): {}'.format(pts_standard))
+    print('Players points (advanced): {}'.format(pts_advanced))
+
+
+def pp_2darray(arr):
+    """
+    Pretty print array
+    """
+    str_arr = "[\n"
+    for row in range(arr.shape[0]):
+        str_arr += '[{}], \n'.format(', '.join(["'{}'".format(f) for f in arr[row]]))
+    str_arr += "]"
+    return str_arr

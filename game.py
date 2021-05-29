@@ -36,7 +36,10 @@ class Game:
         self.P2 = None
         self.P3 = None
         self.P4 = None
+        self.dealer_idx = None
         self.players = [None] * 4
+        self.saved_roi = []
+        self.saved_fig = []
         # paths are assumed to be given by os.listdir in a non deterministic way
         self._paths = order_files_by_name([p for p in self.path.iterdir() if is_image_file(p)])
         self.images = []
@@ -71,16 +74,19 @@ class Game:
         return self.images
 
     def process_step(self, k: int,
-                     show_step: Optional[bool] = None):
+                     show_step: bool,
+                     save_fig: bool,
+                     save_roi: bool):
         """
         Process step k of the game and return the ROI of the players (dimension taken in consts.py)
         and the the overlay of players' name and contours
+        :param save_roi: Whether so save the computed ROI
+        :param save_fig: Whether to save the result with bounding boxes
         :param show_step: Whether to show the process step step
         :param k: Step to process
         """
         assert -1 < k < len(self.images), f"the step must be between {-1} and {len(self.images)} but you provided {k}"
         src = self.images[k]
-        show_step = False if show_step is None else show_step
         bw = process_threshold(src, True, min_val=consts.MIN_THRESHOLD_VAL)
         contours = find_contours(bw)
         contours = keep_and_order_by_criterion(contours, criterion_card_like)
@@ -95,7 +101,7 @@ class Game:
         self.players = [self.P1, self.P2, self.P3, self.P4]
         dealer = cv2.imread(consts.DEALER_PATTERN_PATH, cv2.IMREAD_UNCHANGED)
         box, center, _, _ = match_pattern(src, dealer)
-        assign_dealer(self.players, dealer_center=center)
+        self.dealer_idx = assign_dealer(self.players, dealer_center=center)
         roi_p1 = self.P1.roi_centered(src, consts.H, consts.W)
         roi_p2 = self.P2.roi_centered(src, consts.H, consts.W)
         roi_p3 = self.P3.roi_centered(src, consts.H, consts.W)
@@ -106,6 +112,8 @@ class Game:
         self.P3.write_text(src, "P3")
         self.P4.write_text(src, "P4")
         roi = [roi_p1, roi_p2, roi_p3, roi_p4]
+        self.saved_roi.append(roi) if save_roi else None
+        self.saved_fig.append(src) if save_fig else None
         self._roi_table[k] = roi
         if show_step:
             plt.title(f"Game step {k}")
@@ -121,20 +129,24 @@ class Game:
         """
         return None
 
-    def next_step(self, show_step=True):
+    def next_step(self,
+                  show_step: Optional[bool] = None,
+                  save_fig: Optional[bool] = None,
+                  save_roi: Optional[bool] = None):
         """
         Process the next step of the game and update the current_step and game status
         :return: either None, None if game is ended or ROI, dest
         """
+        show_step = show_step if show_step is not None else False
+        save_fig = save_fig if save_fig is not None else False
+        save_roi = save_roi if save_roi is not None else False
         if self.is_done:
             return None, None
         if self._current_step < self.max_step:
-            ret = self.process_step(self._current_step + 1, show_step=show_step)
+            ret = self.process_step(self._current_step + 1, show_step=show_step, save_fig=save_fig, save_roi=save_roi)
             self._current_step += 1
             self.is_done = self._current_step + 1 == self.max_step
             return ret
         else:
             self.is_done = True
             return None, None
-    def compute_score(self):
-        return None

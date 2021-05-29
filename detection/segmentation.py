@@ -76,9 +76,3 @@ def match_pattern(img: np.ndarray,
     ref_x, ref_y = maxLoc
     box_points = np.int0([maxLoc, (ref_x + dimx, ref_y), (ref_x + dimx, ref_y + dimy), (ref_x, ref_y + dimy)])
     return box_points, center, img[maxLoc[1]: matchLoc[1] + dimy, maxLoc[0]: matchLoc[0] + dimx, :], pattern
-
-# TODO
-
-
-# TODO adapter las angles au sens naturel
-# TODO Adapter width et height a un sens conventionnel

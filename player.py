@@ -170,5 +170,10 @@ class Player:
         size = (w_, h_) if not rotate else (h_, w_)
         warped = cv2.warpPerspective(img.copy(), M, size)
         cv2.drawContours(img, [np.int0(src_box)], -1, consts.BOUNDING_BOX_COLOR, consts.BOUNDING_BOX_THICKNESS)
-        angle = cv2.ROTATE_180 if (self.ordinal is Ordinal.WEST or self.ordinal is Ordinal.NORTH) else cv2.ROTATE_90_CLOCKWISE
-        return warped if not rotate else cv2.rotate(warped, angle)
+        # At this stage ROI cards of players P1 P3 are laying vertical and oriented as seen from player side
+        # ROI cards of players P2 P4 are laying horizontal and oriented as seen from player side
+        # For the sake of detection we change orientations of all cards to be the same as player P1
+        # P2 is rotated pi/2 while P4 is rotate -p/2 and P3 is rotated pi
+        angle = cv2.ROTATE_90_COUNTERCLOCKWISE if self.ordinal is Ordinal.WEST else cv2.ROTATE_90_CLOCKWISE
+        angle = cv2.ROTATE_180 if self.ordinal is Ordinal.NORTH else angle
+        return warped if not (rotate or self.ordinal is Ordinal.NORTH) else cv2.rotate(warped, angle)
